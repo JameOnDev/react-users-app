@@ -3,47 +3,74 @@ import { useEffect, useState } from "react";
 function Users() {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
+    const [error, setError] = useState(null);
+    const [reloadIndex, setReloadIndex] = useState(0);
 
     useEffect(() => {
-        fetch("https://jsonplaceholder.typicode.com/users")
-            .then((response) => response.json())
+        const controller = new AbortController();
+
+        fetch("https://jsonplaceholder.typicode.com/users", {
+            signal: controller.signal,
+        })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then((data) => {
-                console.log(data);
                 setUsers(data);
                 setLoading(false);
             })
-            .catch(() => {
-                console.log("Error");
-                setError(true);
+            .catch((err) => {
+                if (err.name === "AbortError") return;
+                console.error("Error fetching users:", err);
+                setError(err.message);
                 setLoading(false);
-            })
-    }, []);
+            });
 
-    //กรณี loding
+        return () => controller.abort();
+    }, [reloadIndex]);
+
+    const handleRetry = () => {
+        setLoading(true);
+        setError(null);
+        setReloadIndex((index) => index + 1);
+    };
+
     if (loading) {
         return <h2>Loading...</h2>;
     }
 
-    //กรณี Error
     if (error) {
-        return <h2>เกิดข้อผิดพลาด</h2>;
+        return (
+            <div>
+                <h2>เกิดข้อผิดพลาด: {error}</h2>
+                <button onClick={handleRetry}>ลองใหม่</button>
+            </div>
+        );
+    }
+
+    if (users.length === 0) {
+        return <h2>ไม่พบข้อมูลผู้ใช้</h2>;
     }
 
     return (
         <div>
-            <>
-            {loading  ? <h2>Loading...</h2> : <h1>Users</h1>}
-            </>
-
-            {users.map((user) => (
-            <div key={user.id}>
-                <h3>{user.name}</h3>
-                <p>{user.email}</p>
-            </div>
-            ))}
+            <h1>Users</h1>
+            <ul>
+                {users.map((user) => (
+                    <li key={user.id}>
+                        <h3>{user.name}</h3>
+                        <p>
+                            <a href={`mailto:${user.email}`}>{user.email}</a>
+                        </p>
+                        <p>{user.company?.name}</p>
+                    </li>
+                ))}
+            </ul>
         </div>
     );
 }
 
-export default Users
+export default Users;
